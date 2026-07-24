@@ -1,4 +1,4 @@
-const EyeScreening = require("../models/EyeScreening");
+const EyeScreening = require("../models/Eyescreening");
 
 // Create Eye Screening
 const createEyeScreening = async (req, res) => {
