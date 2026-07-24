@@ -1,0 +1,116 @@
+const MedicalHistory = require("../models/MedicalHistory");
+
+// Create Medical History
+const createMedicalHistory = async (req, res) => {
+  try {
+    const medicalHistory = await MedicalHistory.create(req.body);
+
+    res.status(201).json({
+      success: true,
+      message: "Medical History Saved Successfully",
+      medicalHistory,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+// ================= Get All Medical Histories =================
+
+const getMedicalHistories = async (req, res) => {
+  try {
+
+    const medicalHistories = await MedicalHistory.find()
+      .populate("patientId")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      medicalHistories,
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+
+  }
+};
+// ================= Get Medical History By Patient =================
+
+const getMedicalHistoryByPatient = async (req, res) => {
+  try {
+
+    const medicalHistory = await MedicalHistory.findOne({
+      patientId: req.params.patientId,
+    }).populate("patientId");
+
+    if (!medicalHistory) {
+      return res.status(404).json({
+        success: false,
+        message: "Medical History not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      medicalHistory,
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+
+  }
+};
+// ================= Update Medical History =================
+
+const updateMedicalHistory = async (req, res) => {
+  try {
+
+    const medicalHistory = await MedicalHistory.findById(req.params.id);
+
+    if (!medicalHistory) {
+      return res.status(404).json({
+        success: false,
+        message: "Medical History not found",
+      });
+    }
+
+    medicalHistory.diabetes = req.body.diabetes;
+    medicalHistory.hypertension = req.body.hypertension;
+    medicalHistory.cataractSurgery = req.body.cataractSurgery;
+    medicalHistory.eyeInjury = req.body.eyeInjury;
+    medicalHistory.spectacles = req.body.spectacles;
+    medicalHistory.remarks = req.body.remarks;
+
+    await medicalHistory.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Medical History Updated Successfully",
+      medicalHistory,
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+
+  }
+};
+module.exports = {
+  createMedicalHistory,
+  getMedicalHistories,
+  getMedicalHistoryByPatient,
+  updateMedicalHistory,
+};
