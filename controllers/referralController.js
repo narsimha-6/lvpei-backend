@@ -191,14 +191,14 @@ const createReferral = async (req, res) => {
     }
 
     await createHistory({
-      referralId: referral._id,
+  referralId: referral._id,
 
-      action: "REFERRAL_CREATED",
+  action: "REFERRAL_CREATED",
 
-      performedBy: req.user._id,
+  performedBy: req.user._id,
 
-      remarks: referralReason,
-    });
+  remarks: normalizedReferralReason,
+});
     const createdReferral =
       await Referral.findById(referral._id)
         .populate(
@@ -223,10 +223,14 @@ const createReferral = async (req, res) => {
   } catch (error) {
     console.error(error);
 
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    console.error("Referral Error Stack:");
+console.error(error);
+
+return res.status(500).json({
+  success: false,
+  message: error.message,
+  stack: error.stack,
+});
   }
 };
 const getIncomingReferrals = async (
