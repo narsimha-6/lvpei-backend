@@ -16,12 +16,12 @@ const referralSchema = new mongoose.Schema(
         "VISION_CENTER",
         "SECONDARY_CENTER",
       ],
-      required: true,
+      default: "VISION_CENTER",
     },
 
     referredCenterId: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true,
+      default: null,
     },
 
     // Referral Information
@@ -49,6 +49,11 @@ const referralSchema = new mongoose.Schema(
         "EMERGENCY",
       ],
       default: "NORMAL",
+    },
+
+    followUpDate: {
+      type: Date,
+      default: null,
     },
 
     // Workflow Status

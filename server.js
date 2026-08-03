@@ -9,6 +9,11 @@ dotenv.config();
 // Database Connection
 const connectDB = require("./config/db");
 const settingRoutes = require("./routes/settingRoutes");
+const referralRoutes = require("./routes/referralRoutes");
+const visionCenterRoutes = require("./routes/visionCenterRoutes");
+const visionCenterAdminRoutes = require("./routes/visionCenterAdminRoutes");
+const { protect } = require("./middleware/authMiddleware");
+const { createReferral } = require("./controllers/referralController");
 const app = express();
 
 const server = http.createServer(app);
@@ -61,10 +66,12 @@ app.use(
 );
 
 // Referral
-app.use(
-  "/api/referrals",
-  require("./routes/referralRoutes")
-);
+app.post("/api/referral", protect, createReferral);
+app.post("/api/referral/", protect, createReferral);
+app.post("/api/referrals", protect, createReferral);
+app.post("/api/referrals/", protect, createReferral);
+app.use("/api/referral", referralRoutes);
+app.use("/api/referrals", referralRoutes);
 
 // Attachments
 app.use(
@@ -80,8 +87,10 @@ app.use(
 app.use("/api/settings", settingRoutes);
 app.use("/api/regions", require("./routes/regionRoutes"));
 app.use("/api/review", require("./routes/reviewRoutes"));
-app.use("/api/vision-centers", require("./routes/visionCenterRoutes"));
-app.use("/api/vision-center-admin", require("./routes/visionCenterAdminRoutes"));
+app.use("/api/vision-center", visionCenterRoutes);
+app.use("/api/vision-centers", visionCenterRoutes);
+app.use("/api/vision-center-admin", visionCenterAdminRoutes);
+app.use("/api/vision-center-admins", visionCenterAdminRoutes);
 app.use("/api/secondary-centers", require("./routes/secondaryCenterRouter"));
 app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/notifications", require("./routes/notificationRoutes"));
@@ -89,6 +98,12 @@ app.use("/api/notifications", require("./routes/notificationRoutes"));
 
 app.get("/", (req, res) => {
   res.send("LVPEI Backend Running Successfully 🚀");
+});
+app.post("/api/test-referral", (req, res) => {
+  res.json({
+    success: true,
+    message: "Referral route is working",
+  });
 });
 
 // ==================== 404 Route ====================

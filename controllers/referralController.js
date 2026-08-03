@@ -40,25 +40,62 @@ const createReferral = async (req, res) => {
   try {
     const {
       patientId,
-      referredCenterType,
-      referredCenterId,
-      referralReason,
+      referralRequired,
+      referralCenter,
+      referredCenterType: requestedCenterType,
+      referredCenterId: requestedCenterId,
+      referralReason: incomingReferralReason,
       diagnosisSummary,
-      remarks,
-      priority,
+      remarks: incomingRemarks,
+      priority: incomingPriority,
+      followUpDate: incomingFollowUpDate,
+      notification,
+      reason,
+      centerId,
+      centerType,
     } = req.body;
-    if (
-      !patientId ||
-      !referredCenterType ||
-      !referredCenterId ||
-      !referralReason
-    ) {
+
+    const shouldRequireReferral = referralRequired !== false;
+    const resolvedCenterId =
+      requestedCenterId ||
+      referralCenter?.id ||
+      referralCenter?._id ||
+      referralCenter?.centerId ||
+      referralCenter ||
+      notification?.centerId ||
+      centerId ||
+      null;
+
+    const resolvedCenterType =
+      requestedCenterType ||
+      referralCenter?.type ||
+      referralCenter?.centerType ||
+      centerType ||
+      "VISION_CENTER";
+
+    const normalizedPriority = incomingPriority || notification?.priority || "NORMAL";
+    const normalizedFollowUpDate = incomingFollowUpDate || notification?.followUpDate || null;
+    const normalizedRemarks = incomingRemarks || notification?.remarks || remarks || "";
+    const normalizedReferralReason =
+      incomingReferralReason ||
+      reason ||
+      (normalizedRemarks ? "Referral requested" : "Referral requested by user");
+
+    if (!patientId) {
       return res.status(400).json({
         success: false,
-        message: "Required fields are missing",
+        message: "Patient ID is required",
       });
     }
-   const patient = await Patient.findById(patientId);
+
+    if (shouldRequireReferral && !resolvedCenterId) {
+      return res.status(400).json({
+        success: false,
+        message: "Referral center is required",
+      });
+    }
+
+    const patient = await Patient.findById(patientId);
 
     if (!patient) {
       return res.status(404).json({
@@ -68,105 +105,90 @@ const createReferral = async (req, res) => {
     }
 
     let assignedAdmin = null;
-    if (referredCenterType === "VISION_CENTER") {
-      console.log("Referral Center ID:", referredCenterId);
+    if (resolvedCenterId) {
+      if (resolvedCenterType === "VISION_CENTER") {
+        const center = await VisionCenter.findById(resolvedCenterId);
 
-const center = await VisionCenter.findById(referredCenterId);
+        if (!center) {
+          return res.status(404).json({
+            success: false,
+            message: "Vision Center not found",
+          });
+        }
 
-console.log("Vision Center Found:", center);
-
-if (!center) {
-  return res.status(404).json({
-    success: false,
-    message: "Vision Center not found",
-  });
-}
-
-const admins = await User.find({
-  role: "VISION_CENTER_ADMIN",
-    });
-
-    console.log("All Vision Center Admins:", admins);
-
-    assignedAdmin = await User.findOne({
-      role: "VISION_CENTER_ADMIN",
-      visionCenter: referredCenterId,
-      status: "ACTIVE",
-    });
-
-    console.log("Assigned Admin:", assignedAdmin);
-
-      if (!assignedAdmin) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "No Vision Center Admin assigned.",
+        assignedAdmin = await User.findOne({
+          role: "VISION_CENTER_ADMIN",
+          visionCenter: resolvedCenterId,
+          status: "ACTIVE",
         });
+
+        if (!assignedAdmin && shouldRequireReferral) {
+          return res.status(404).json({
+            success: false,
+            message: "No Vision Center Admin assigned.",
+          });
+        }
+      }
+
+      if (resolvedCenterType === "SECONDARY_CENTER") {
+        const center = await SecondaryCenter.findById(resolvedCenterId);
+
+        if (!center) {
+          return res.status(404).json({
+            success: false,
+            message: "Secondary Center not found",
+          });
+        }
+
+        assignedAdmin = await User.findOne({
+          role: "SECONDARY_CENTER_ADMIN",
+          secondaryCenter: resolvedCenterId,
+          status: "ACTIVE",
+        });
+
+        if (!assignedAdmin && shouldRequireReferral) {
+          return res.status(404).json({
+            success: false,
+            message: "No Secondary Center Admin assigned.",
+          });
+        }
       }
     }
-    if (
-      referredCenterType ===
-      "SECONDARY_CENTER"
-    ) {
-      const center =
-        await SecondaryCenter.findById(
-          referredCenterId
-        );
 
-      if (!center) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Secondary Center not found",
-        });
-      }
-
-      assignedAdmin = await User.findOne({
-        role: "SECONDARY_CENTER_ADMIN",
-        secondaryCenter: referredCenterId,
-        status: "ACTIVE",
-      });
-
-      if (!assignedAdmin) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "No Secondary Center Admin assigned.",
-        });
-      }
-    }
     const referral = await Referral.create({
       patientId,
-
-      referredCenterType,
-
-      referredCenterId,
-
-      referralReason,
-
+      referredCenterType: resolvedCenterType,
+      referredCenterId: resolvedCenterId,
+      referralReason: normalizedReferralReason,
       diagnosisSummary,
-
-      remarks,
-
-      priority,
-
+      remarks: normalizedRemarks,
+      priority: normalizedPriority,
+      followUpDate: normalizedFollowUpDate,
       referredBy: req.user._id,
-
-      assignedTo: assignedAdmin._id,
-
+      assignedTo: assignedAdmin ? assignedAdmin._id : null,
       status: "PENDING",
     });
 
-    const io = req.app.get("io");
+    if (assignedAdmin) {
+      const io = req.app.get("io");
+      const notificationTitle = notification?.title || "New Referral";
+      const notificationBody =
+        notification?.body ||
+        notification?.message ||
+        "New referral created";
+      const followUpText = normalizedFollowUpDate
+        ? ` Follow-up date: ${new Date(normalizedFollowUpDate).toLocaleDateString("en-IN")}.`
+        : "";
 
-    await createNotification({
-    receiver: assignedAdmin._id,
-    sender: req.user._id,
-    title: "New Referral",
-    message: "New referral created",
-    referralId: referral._id,
-    io,
-});
+      await createNotification({
+        receiver: assignedAdmin._id,
+        sender: req.user._id,
+        title: notificationTitle,
+        message: `${notificationBody}${followUpText}`,
+        referralId: referral._id,
+        io,
+      });
+    }
 
     await createHistory({
       referralId: referral._id,
@@ -621,6 +643,27 @@ const completeReferral = async (req, res) => {
   }
 };
 
+const getAllReferrals = async (req, res) => {
+  try {
+    const referrals = await Referral.find()
+      .populate("patientId", "patientName mobile village mandal district")
+      .populate("referredBy", "name employeeCode role")
+      .populate("assignedTo", "name employeeCode role")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: referrals.length,
+      referrals,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 const getReferralHistory = async (req, res) => {
   try {
 
@@ -679,6 +722,8 @@ const getReferralById = async (req, res) => {
 };
 module.exports = {
   createReferral,
+
+  getAllReferrals,
 
   getIncomingReferrals,
 

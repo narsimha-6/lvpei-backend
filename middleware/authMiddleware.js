@@ -34,11 +34,14 @@ const protect = async (req, res, next) => {
 
     next();
   } catch (error) {
-    return res.status(401).json({
-      success: false,
-      message: "Invalid token",
-    });
-  }
+  console.log("JWT Error Name:", error.name);
+  console.log("JWT Error Message:", error.message);
+
+  return res.status(401).json({
+    success: false,
+    message: error.message,
+  });
+}
 };
 
 // Role Authorization Middleware
