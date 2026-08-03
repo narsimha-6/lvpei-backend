@@ -221,17 +221,15 @@ const createReferral = async (req, res) => {
       referral: createdReferral,
     });
   } catch (error) {
-    console.error(error);
+  console.error("========== REFERRAL ERROR ==========");
+  console.error(error.stack);
 
-    console.error("Referral Error Stack:");
-console.error(error);
-
-return res.status(500).json({
-  success: false,
-  message: error.message,
-  stack: error.stack,
-});
-  }
+  return res.status(500).json({
+    success: false,
+    message: error.message,
+    stack: error.stack,
+  });
+}
 };
 const getIncomingReferrals = async (
   req,
